@@ -1,15 +1,20 @@
-﻿# tianyi_store.py - 天翼下载状态存储
+# tianyi_store.py - 天翼下载状态存储
 #
 # 该模块只负责本地状态读写，不处理网络请求。
 
 from __future__ import annotations
 
 import json
+import logging
 import os
+import shutil
 import threading
 import time
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional
+
+
+logger = logging.getLogger("freedeck")
 
 
 def _now_ts() -> int:
@@ -172,13 +177,47 @@ class TianyiStateStore:
         """返回状态文件路径。"""
         return self._state_file
 
+    def _recover_from_backup(self) -> Dict[str, Any]:
+        """主状态损坏时保留现场，并尝试从 .bak 恢复。"""
+        try:
+            os.replace(self._state_file, f"{self._state_file}.corrupt-{_now_ts()}")
+        except Exception:
+            pass
+        bak_path = f"{self._state_file}.bak"
+        if os.path.isfile(bak_path):
+            try:
+                with open(bak_path, "r", encoding="utf-8") as f:
+                    raw = json.load(f)
+                if isinstance(raw, dict):
+                    return raw
+            except Exception as exc:
+                logger.warning("state.json 备份同样损坏，重置为空状态: %s", exc)
+        return {}
+
+    def _post_write_housekeeping(self) -> None:
+        """写入成功后：限制权限（含 Cookie）并刷新 .bak 备份。尽力而为，不抛异常。"""
+        try:
+            os.chmod(self._state_file, 0o600)
+        except Exception:
+            pass
+        try:
+            # copy2 会连同 0o600 权限一起复制
+            shutil.copy2(self._state_file, f"{self._state_file}.bak")
+        except Exception:
+            pass
+
     def load(self) -> None:
         """从磁盘加载状态。"""
         with self._lock:
             if not os.path.exists(self._state_file):
                 return
-            with open(self._state_file, "r", encoding="utf-8") as f:
-                raw = json.load(f)
+            raw: Dict[str, Any] = {}
+            try:
+                with open(self._state_file, "r", encoding="utf-8") as f:
+                    raw = json.load(f)
+            except Exception as exc:
+                logger.warning("state.json 读取失败，尝试从备份恢复: %s", exc)
+                raw = self._recover_from_backup()
 
             login_raw = raw.get("login") if isinstance(raw, dict) else {}
             settings_raw = raw.get("settings") if isinstance(raw, dict) else {}
@@ -264,6 +303,7 @@ class TianyiStateStore:
                 # 临时文件写入失败时直接回退到目标文件写入。
                 with open(self._state_file, "w", encoding="utf-8") as f:
                     json.dump(payload, f, ensure_ascii=False, indent=2)
+                self._post_write_housekeeping()
                 return
 
             for attempt in range(2):
@@ -279,11 +319,13 @@ class TianyiStateStore:
                         continue
 
             if replace_error is None:
+                self._post_write_housekeeping()
                 return
 
             # rename 仍失败时回退为直接覆盖写入，避免调用链整体失败。
             with open(self._state_file, "w", encoding="utf-8") as f:
                 json.dump(payload, f, ensure_ascii=False, indent=2)
+            self._post_write_housekeeping()
             try:
                 if os.path.exists(tmp_path):
                     os.remove(tmp_path)
