@@ -251,7 +251,8 @@ def _parse_int(value: object, default: int = 0) -> int:
     """解析整数。"""
     try:
         return int(str(value))
-    except Exception:
+    except Exception as exc:
+        _LOGGER.debug("解析整数失败: %s", exc)
         return default
 
 
@@ -264,7 +265,8 @@ def _as_optional_int(value: object) -> Optional[int]:
         if not text:
             return None
         return int(text)
-    except Exception:
+    except Exception as exc:
+        _LOGGER.debug("解析可选整数失败: %s", exc)
         return None
 
 
@@ -326,13 +328,15 @@ def _normalize_json_payload(data: object) -> Dict[str, object]:
             inner = str(jsonp_match.group("body") or "").strip()
             try:
                 return _normalize_json_payload(json.loads(inner))
-            except Exception:
+            except Exception as exc:
+                _LOGGER.debug("解析 JSONP 响应失败: %s", exc)
                 pass
 
         if raw.startswith("{") or raw.startswith("["):
             try:
                 return _normalize_json_payload(json.loads(raw))
-            except Exception:
+            except Exception as exc:
+                _LOGGER.debug("解析 JSON 响应文本失败: %s", exc)
                 pass
 
         return {"message": raw, "_raw_text": raw}
@@ -628,7 +632,8 @@ def _resolve_node_binary() -> str:
         try:
             if candidate.is_file():
                 return str(candidate)
-        except Exception:
+        except Exception as exc:
+            _LOGGER.debug("检查 node 运行时路径失败: %s", exc)
             continue
 
     system_path = shutil.which("node")
@@ -652,7 +657,8 @@ def _get_js_share_resolver_path() -> str:
         try:
             if candidate.is_file():
                 return str(candidate)
-        except Exception:
+        except Exception as exc:
+            _LOGGER.debug("检查 JS 分享解析器路径失败: %s", exc)
             continue
     return ""
 
@@ -809,7 +815,8 @@ def _build_tls_context() -> ssl.SSLContext:
         certifi_path = str(certifi.where() or "").strip()
         if certifi_path:
             candidates.append(certifi_path)
-    except Exception:
+    except Exception as exc:
+        _LOGGER.debug("加载 certifi 证书失败: %s", exc)
         pass
 
     dedup: List[str] = []
@@ -826,7 +833,8 @@ def _build_tls_context() -> ssl.SSLContext:
             continue
         try:
             return ssl.create_default_context(cafile=path)
-        except Exception:
+        except Exception as exc:
+            _LOGGER.warning("使用 CA 证书构建 TLS 上下文失败: %s", exc)
             continue
 
     context = ssl.create_default_context()
@@ -926,7 +934,8 @@ def _try_parse_xml_payload(text: str) -> Optional[Dict[str, object]]:
         return _try_parse_xml_payload_fallback(raw)
     try:
         root = ET.fromstring(raw)
-    except Exception:
+    except Exception as exc:
+        _LOGGER.debug("解析 XML 响应失败，回退到简易解析: %s", exc)
         return _try_parse_xml_payload_fallback(raw)
 
     value = _xml_node_to_value(root)
@@ -1680,7 +1689,8 @@ def _get_js_cloud_upload_path() -> str:
         try:
             if candidate.is_file():
                 return str(candidate)
-        except Exception:
+        except Exception as exc:
+            _LOGGER.debug("检查 JS 云上传脚本路径失败: %s", exc)
             continue
     return ""
 

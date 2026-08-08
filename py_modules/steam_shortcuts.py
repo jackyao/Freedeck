@@ -24,7 +24,8 @@ import config
 def _safe_int(value: Any, default: int = 0) -> int:
     try:
         return int(value)
-    except Exception:
+    except Exception as exc:
+        config.logger.debug("解析整数失败: %s", exc)
         return default
 
 
@@ -43,7 +44,8 @@ def _find_steam_root() -> str:
 def _steam64_to_account_id(steam64_id: str) -> str:
     try:
         value = int(str(steam64_id).strip())
-    except Exception:
+    except Exception as exc:
+        config.logger.debug("解析 Steam64 ID 失败: %s", exc)
         return ""
     return str(value & 0xFFFFFFFF)
 
@@ -87,7 +89,8 @@ def _detect_active_user(steam_root: str) -> str:
             if not os.path.isdir(full):
                 continue
             candidates.append((name, os.path.getmtime(full)))
-    except Exception:
+    except Exception as exc:
+        config.logger.debug("枚举 Steam 用户目录失败: %s", exc)
         return ""
 
     if not candidates:
@@ -219,7 +222,8 @@ def _upsert_shortcut_sync(
         for key in shortcuts.keys():
             try:
                 numeric.append(int(str(key)))
-            except Exception:
+            except Exception as exc:
+                config.logger.debug("解析 Steam 快捷方式索引失败: %s", exc)
                 continue
         target_idx = str((max(numeric) + 1) if numeric else 0)
         target_entry = {}
@@ -492,7 +496,8 @@ async def _download_image_to(path: str, url: str) -> bool:
                     return False
         await asyncio.to_thread(_atomic_write_bytes, target, data)
         return True
-    except Exception:
+    except Exception as exc:
+        config.logger.debug("下载 Steam 封面图片失败: %s", exc)
         return False
 
 
@@ -519,7 +524,8 @@ def _copy_file_sync(source_path: str, target_path: str) -> bool:
             data = src.read()
         _atomic_write_bytes(target, data)
         return True
-    except Exception:
+    except Exception as exc:
+        config.logger.debug("复制 Steam 封面文件失败: %s", exc)
         return False
 
 

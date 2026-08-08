@@ -144,7 +144,8 @@ async def stop_server(plugin: Any) -> dict:
 
     try:
         await utils.wait_for_port_release(int(getattr(plugin, "server_port", config.DEFAULT_SERVER_PORT)))
-    except Exception:
+    except Exception as exc:
+        config.logger.debug("等待服务端口释放失败: %s", exc)
         pass
 
     await save_settings(plugin)

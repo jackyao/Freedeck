@@ -38,7 +38,8 @@ def _safe_int(value: str) -> int:
     """安全解析整数字段。"""
     try:
         return int(str(value).strip())
-    except Exception:
+    except Exception as exc:
+        config.logger.debug("解析整数字段失败: %s", exc)
         return 0
 
 
@@ -74,7 +75,8 @@ def resolve_default_catalog_path() -> str:
     for path in candidates:
         try:
             resolved = path.expanduser().resolve()
-        except Exception:
+        except Exception as exc:
+            config.logger.debug("解析目录文件路径失败: %s", exc)
             continue
         if resolved.is_file():
             return str(resolved)

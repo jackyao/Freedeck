@@ -159,7 +159,8 @@ def _safe_int(value: Any, default: int = 0) -> int:
     """安全解析整数。"""
     try:
         return int(value)
-    except Exception:
+    except Exception as exc:
+        config.logger.debug("解析整数失败: %s", exc)
         return default
 
 
@@ -784,7 +785,8 @@ class TianyiService:
                 continue
             try:
                 shortcut = await asyncio.to_thread(resolve_tianyi_shortcut_sync, game_id=game_id)
-            except Exception:
+            except Exception as exc:
+                config.logger.debug("解析已安装游戏快捷方式失败: %s", exc)
                 continue
             if not bool(shortcut.get("ok")):
                 continue
@@ -1660,7 +1662,8 @@ class TianyiService:
                                 if int(resp.status) != 200:
                                     continue
                                 payload = await resp.json(content_type=None)
-                        except Exception:
+                        except Exception as exc:
+                            config.logger.debug("搜索 Steam 商店封面失败: %s", exc)
                             continue
 
                         items = payload.get("items") if isinstance(payload, dict) else []
@@ -1829,7 +1832,8 @@ class TianyiService:
                     return {}
                 tier = str(payload.get("tier", "") or "").strip()
                 return {"tier": tier}
-        except Exception:
+        except Exception as exc:
+            config.logger.debug("获取 ProtonDB 兼容性数据失败: %s", exc)
             return {}
 
     def _build_hltb_search_payload(self, term: str) -> Dict[str, Any]:
@@ -1876,7 +1880,8 @@ class TianyiService:
                 if int(resp.status) != 200:
                     return ""
                 data = await resp.json(content_type=None)
-        except Exception:
+        except Exception as exc:
+            config.logger.debug("获取 HLTB 鉴权 token 失败: %s", exc)
             return ""
         if not isinstance(data, dict):
             return ""
@@ -1901,7 +1906,8 @@ class TianyiService:
                 if status != 200:
                     return status, []
                 data = await resp.json(content_type=None)
-        except Exception:
+        except Exception as exc:
+            config.logger.debug("请求 HLTB 搜索接口失败: %s", exc)
             return 0, []
         rows = data.get("data") if isinstance(data, dict) else []
         if isinstance(rows, list):
@@ -1921,7 +1927,8 @@ class TianyiService:
                 if int(resp.status) != 200:
                     return []
                 data = await resp.json(content_type=None)
-        except Exception:
+        except Exception as exc:
+            config.logger.debug("请求旧版 HLTB 搜索接口失败: %s", exc)
             return []
         rows = data.get("data") if isinstance(data, dict) else []
         if isinstance(rows, list):
@@ -3066,7 +3073,8 @@ class TianyiService:
             return ""
         try:
             normalized = os.path.realpath(os.path.expanduser(raw))
-        except Exception:
+        except Exception as exc:
+            config.logger.debug("规范化目录路径失败: %s", exc)
             return ""
         return str(normalized or "").strip()
 
@@ -3144,7 +3152,8 @@ class TianyiService:
             return ""
         try:
             result = resolve_tianyi_shortcut_sync(game_id=target_game_id)
-        except Exception:
+        except Exception as exc:
+            config.logger.warning("解析 Proton 用户目录失败: %s", exc)
             return ""
         return self._normalize_existing_dir(str(result.get("compat_user_dir", "") or ""))
 
@@ -3173,7 +3182,8 @@ class TianyiService:
             return 0
         try:
             return int(time.mktime(time.strptime(stem, CLOUD_SAVE_DATE_FORMAT)))
-        except Exception:
+        except Exception as exc:
+            config.logger.debug("解析云存档版本时间戳失败: %s", exc)
             return 0
 
     def _format_cloud_save_version_time(self, ts: int, fallback: str) -> str:
@@ -3183,7 +3193,8 @@ class TianyiService:
             return str(fallback or "")
         try:
             return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(value))
-        except Exception:
+        except Exception as exc:
+            config.logger.debug("格式化云存档版本时间失败: %s", exc)
             return str(fallback or "")
 
     def _collect_cloud_restore_games(self) -> List[Dict[str, Any]]:
@@ -3500,7 +3511,8 @@ class TianyiService:
             with os.scandir(current_dir) as it:
                 for _ in it:
                     return True
-        except Exception:
+        except Exception as exc:
+            config.logger.debug("扫描存档目录内容失败: %s", exc)
             return False
         return False
 
@@ -4108,7 +4120,8 @@ class TianyiService:
                     shutil.rmtree(path, ignore_errors=True)
                 elif os.path.exists(path):
                     os.remove(path)
-            except Exception:
+            except Exception as exc:
+                config.logger.debug("清理云存档临时文件失败: %s", exc)
                 pass
 
     async def _run_cloud_save_upload_task(self, *, cookie: str, user_account: str) -> None:
@@ -5438,7 +5451,8 @@ class TianyiService:
                 )
             try:
                 os.rmdir(source_path)
-            except Exception:
+            except Exception as exc:
+                config.logger.warning("合并后移除源目录失败: %s", exc)
                 pass
             return
 
@@ -5447,7 +5461,8 @@ class TianyiService:
         else:
             try:
                 os.remove(target_path)
-            except Exception:
+            except Exception as exc:
+                config.logger.warning("移除待覆盖目标文件失败: %s", exc)
                 pass
         shutil.move(source_path, target_path)
 
@@ -5486,7 +5501,8 @@ class TianyiService:
             return
         try:
             await client.close()
-        except Exception:
+        except Exception as exc:
+            config.logger.debug("关闭 aiohttp 会话失败: %s", exc)
             pass
 
     async def _close_qr_login_context_locked(self) -> None:
@@ -5518,7 +5534,8 @@ class TianyiService:
             certifi_path = str(certifi.where() or "").strip()
             if certifi_path:
                 candidates.append(certifi_path)
-        except Exception:
+        except Exception as exc:
+            config.logger.debug("加载 certifi 证书失败: %s", exc)
             pass
 
         dedup_candidates: List[str] = []
@@ -5588,7 +5605,8 @@ class TianyiService:
                 continue
             try:
                 return int(str(payload.get(key)))
-            except Exception:
+            except Exception as exc:
+                config.logger.debug("解析二维码状态码失败: %s", exc)
                 continue
         return -99999
 
@@ -5767,7 +5785,8 @@ class TianyiService:
             try:
                 async with client.get(url, headers=headers, allow_redirects=True) as resp:
                     await resp.read()
-            except Exception:
+            except Exception as exc:
+                config.logger.warning("访问登录跳转地址失败: %s", exc)
                 continue
 
         cloud_scoped_count = 0
@@ -6351,12 +6370,14 @@ class TianyiService:
             if conn is not None:
                 try:
                     conn.close()
-                except Exception:
+                except Exception as exc:
+                    config.logger.debug("关闭 Cookie 数据库连接失败: %s", exc)
                     pass
             if temp_path:
                 try:
                     os.remove(temp_path)
-                except Exception:
+                except Exception as exc:
+                    config.logger.debug("删除 Cookie 数据库临时副本失败: %s", exc)
                     pass
 
     async def _collect_tianyi_cookie_from_cookie_db(self) -> tuple[str, Dict[str, Any]]:

@@ -273,11 +273,13 @@ class Aria2Manager:
         """移除任务。"""
         try:
             await self._rpc_call("aria2.remove", [gid])
-        except Exception:
+        except Exception as exc:
+            config.logger.warning("移除 aria2 下载任务失败: %s", exc)
             pass
         try:
             await self._rpc_call("aria2.removeDownloadResult", [gid])
-        except Exception:
+        except Exception as exc:
+            config.logger.warning("清理 aria2 下载结果失败: %s", exc)
             pass
 
     def stop(self) -> None:
@@ -292,7 +294,8 @@ class Aria2Manager:
             except Exception:
                 try:
                     runtime.process.kill()
-                except Exception:
+                except Exception as exc:
+                    config.logger.debug("强制结束 aria2 进程失败: %s", exc)
                     pass
 
 

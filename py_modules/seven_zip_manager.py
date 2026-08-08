@@ -11,6 +11,8 @@ import subprocess
 from pathlib import Path
 from typing import Callable, List, Optional, Sequence
 
+import config
+
 
 class SevenZipError(RuntimeError):
     """7z 相关异常。"""
@@ -106,7 +108,8 @@ class SevenZipManager:
                 if match and progress_cb:
                     try:
                         progress_cb(float(match.group(1)))
-                    except Exception:
+                    except Exception as exc:
+                        config.logger.warning("解压进度回调执行失败: %s", exc)
                         pass
 
         return_code = process.wait()
@@ -117,7 +120,8 @@ class SevenZipManager:
         if progress_cb:
             try:
                 progress_cb(100.0)
-            except Exception:
+            except Exception as exc:
+                config.logger.warning("更新解压完成进度失败: %s", exc)
                 pass
 
     def create_archive(
@@ -148,7 +152,8 @@ class SevenZipManager:
             mode = os.stat(binary).st_mode
             if mode & 0o111 == 0:
                 os.chmod(binary, mode | 0o755)
-        except Exception:
+        except Exception as exc:
+            config.logger.debug("修复 7z 可执行权限失败: %s", exc)
             pass
 
         if working_dir:
@@ -208,7 +213,8 @@ class SevenZipManager:
                 if match and progress_cb:
                     try:
                         progress_cb(float(match.group(1)))
-                    except Exception:
+                    except Exception as exc:
+                        config.logger.warning("压缩进度回调执行失败: %s", exc)
                         pass
 
         return_code = process.wait()
@@ -219,5 +225,6 @@ class SevenZipManager:
         if progress_cb:
             try:
                 progress_cb(100.0)
-            except Exception:
+            except Exception as exc:
+                config.logger.warning("更新压缩完成进度失败: %s", exc)
                 pass
