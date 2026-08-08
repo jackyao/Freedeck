@@ -382,8 +382,10 @@ class TianyiService:
                 self._capture_task.cancel()
                 try:
                     await self._capture_task
-                except BaseException:
+                except asyncio.CancelledError:
                     pass
+                except Exception:
+                    config.logger.exception("关闭时停止登录采集任务异常")
             self._capture_task = None
         async with self._qr_login_lock:
             await self._close_qr_login_context_locked()
@@ -397,8 +399,10 @@ class TianyiService:
         for job in jobs:
             try:
                 await job
-            except BaseException:
+            except asyncio.CancelledError:
                 pass
+            except Exception:
+                config.logger.exception("关闭时停止后处理任务异常")
         self._post_process_jobs.clear()
         await asyncio.to_thread(self.aria2.stop)
 
@@ -1467,8 +1471,10 @@ class TianyiService:
                 self._capture_task.cancel()
                 try:
                     await self._capture_task
-                except BaseException:
+                except asyncio.CancelledError:
                     pass
+                except Exception:
+                    config.logger.exception("重启登录采集时停止旧任务异常")
 
             quick_diag: Dict[str, Any] = {"timeout_seconds": timeout}
             await self._set_capture_state(
@@ -1556,8 +1562,10 @@ class TianyiService:
                 self._capture_task.cancel()
                 try:
                     await self._capture_task
-                except BaseException:
+                except asyncio.CancelledError:
                     pass
+                except Exception:
+                    config.logger.exception("停止登录采集任务异常")
             self._capture_task = None
 
             await self._set_capture_state(
@@ -2214,8 +2222,10 @@ class TianyiService:
             target.cancel()
             try:
                 await target
-            except BaseException:
+            except asyncio.CancelledError:
                 pass
+            except Exception:
+                config.logger.exception("取消云存档上传任务异常")
 
     def _new_cloud_save_restore_state(self) -> Dict[str, Any]:
         """构建云存档恢复任务默认状态。"""
