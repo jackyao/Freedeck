@@ -65,7 +65,7 @@ class Aria2Manager:
 
     def _resolve_binary_path(self) -> str:
         """优先解析内置 aria2，可回退系统命令。"""
-        env_path = (os.getenv("FRIENDECK_ARIA2_BIN") or "").strip()
+        env_path = (os.getenv("FREEDECK_ARIA2_BIN") or os.getenv("FRIENDECK_ARIA2_BIN") or "").strip()
         if env_path and os.path.isfile(env_path):
             return env_path
 
