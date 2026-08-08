@@ -9,8 +9,9 @@ import pytest
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PY_MODULES = os.path.join(PROJECT_ROOT, "py_modules")
-if PY_MODULES not in sys.path:
-    sys.path.insert(0, PY_MODULES)
+for _path in (PROJECT_ROOT, PY_MODULES):
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
 
 # decky 仅存在于 Steam Deck 运行时，测试环境用桩模块替代（必须在 import 被测模块前安装）。
 decky_stub = types.ModuleType("decky")
