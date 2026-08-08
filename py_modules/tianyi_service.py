@@ -369,6 +369,11 @@ class TianyiService:
         self._cloud_save_state["last_result"] = dict(self.store.cloud_save_last_result or {})
         self._cloud_save_restore_state["last_result"] = dict(self.store.cloud_save_restore_last_result or {})
         await self._recover_playtime_sessions_from_store()
+        # 恢复上次中断的下载后处理：插件在解压/注册 Steam 阶段被重启时，
+        # 任务会停在 complete 且未后处理的状态，这里重新调度。
+        for task in list(self.store.tasks):
+            if task.status == "complete" and not task.post_processed:
+                self._schedule_post_process_task(task.task_id)
 
     async def shutdown(self) -> None:
         """关闭后台资源。"""
@@ -4996,7 +5001,6 @@ class TianyiService:
 
     async def _post_process_completed_task(self, task: TianyiTaskRecord) -> None:
         """下载完成后执行安装与清理。"""
-        task.post_processed = True
         settings = self.store.settings
 
         local_path = str(task.local_path or "").strip()
@@ -5007,6 +5011,7 @@ class TianyiService:
         if not os.path.isfile(local_path):
             task.install_status = "failed"
             task.install_message = "下载文件不存在，无法安装"
+            task.post_processed = True
             task.updated_at = _now_wall_ts()
             return
 
@@ -5029,6 +5034,7 @@ class TianyiService:
             if not ok:
                 task.install_status = "failed"
                 task.install_message = reason
+                task.post_processed = True
                 task.updated_at = _now_wall_ts()
                 return
         else:
@@ -5041,6 +5047,7 @@ class TianyiService:
             except Exception as exc:
                 task.install_status = "failed"
                 task.install_message = f"复制安装文件失败: {exc}"
+                task.post_processed = True
                 task.updated_at = _now_wall_ts()
                 return
 
@@ -5119,6 +5126,8 @@ class TianyiService:
                 message_parts.append(f"删除压缩包失败: {exc}")
 
         task.install_message = "，".join(message_parts)
+        task.post_processed = True
+        task.updated_at = _now_wall_ts()
 
     def _resolve_install_target_dir(self, task: TianyiTaskRecord, install_root: str) -> str:
         """解析任务的目标安装目录。"""
