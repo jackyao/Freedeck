@@ -11,6 +11,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import ssl
 import subprocess
 import time
@@ -606,6 +607,36 @@ async def _fetch_share_id_from_share_page(
         raise TianyiApiError(f"网络请求失败: {exc}") from exc
 
 
+def _resolve_node_binary() -> str:
+    """解析 node 可执行文件：环境变量 → 插件内置 runtime → 系统 PATH。"""
+    env_path = (os.getenv("FREEDECK_NODE_BIN") or "").strip()
+    if env_path and os.path.isfile(env_path):
+        return env_path
+
+    candidates: List[Path] = []
+    plugin_dir = str(os.environ.get("DECKY_PLUGIN_DIR", "") or "").strip()
+    if plugin_dir:
+        candidates.append(Path(plugin_dir) / "defaults" / "runtime" / "linux-x64" / "node")
+        candidates.append(Path(plugin_dir) / "defaults" / "runtime" / "node")
+
+    # py_modules/tianyi_client.py -> plugin_root/defaults/runtime/...
+    plugin_root = Path(__file__).resolve().parents[1]
+    candidates.append(plugin_root / "defaults" / "runtime" / "linux-x64" / "node")
+    candidates.append(plugin_root / "defaults" / "runtime" / "node")
+
+    for candidate in candidates:
+        try:
+            if candidate.is_file():
+                return str(candidate)
+        except Exception:
+            continue
+
+    system_path = shutil.which("node")
+    if system_path:
+        return system_path
+    raise TianyiApiError("node 运行时不可用，未找到内置 node 或系统 node")
+
+
 def _get_js_share_resolver_path() -> str:
     """定位 JS 分享解析器路径。"""
     candidates: List[Path] = []
@@ -707,7 +738,7 @@ async def _resolve_share_via_js(share_url: str, cookie: str) -> ResolvedShare:
 
     def _run_node() -> subprocess.CompletedProcess[bytes]:
         return subprocess.run(
-            ["node", script_path],
+            [_resolve_node_binary(), script_path],
             input=payload,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -1885,7 +1916,7 @@ async def _invoke_cloud_helper_via_js(
 
     def _run_node() -> subprocess.CompletedProcess[bytes]:
         return subprocess.run(
-            ["node", script_path],
+            [_resolve_node_binary(), script_path],
             input=raw_payload,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
