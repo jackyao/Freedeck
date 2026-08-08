@@ -1,4 +1,4 @@
-﻿# tianyi_service.py - 天翼下载业务编排
+# tianyi_service.py - 天翼下载业务编排
 #
 # 该模块串联目录、登录态、直链与下载任务。
 
@@ -4730,7 +4730,18 @@ class TianyiService:
         """刷新任务列表并同步状态。"""
         tasks = list(self.store.tasks)
         if sync_aria2 and tasks:
+            aria2_ready = True
+            if any(not _is_terminal(t.status) for t in tasks):
+                try:
+                    await self.aria2.ensure_running()
+                except Aria2Error as exc:
+                    # aria2 暂不可用（插件重启后未拉起/启动失败）时保留任务现状，
+                    # 等下一轮轮询重试，避免把进行中任务误判为终态 error。
+                    aria2_ready = False
+                    config.logger.warning("refresh_tasks: aria2 暂不可用，跳过本轮同步: %s", exc)
             for task in tasks:
+                if not aria2_ready:
+                    break
                 if _is_terminal(task.status):
                     continue
                 try:
@@ -4752,7 +4763,9 @@ class TianyiService:
                     if status == "complete" and not task.post_processed:
                         self._schedule_post_process_task(task.task_id)
                 except Aria2Error as exc:
-                    if task.status in {"active", "waiting"}:
+                    # 仅当 aria2 明确不认识该 GID 时才判定失败；
+                    # 超时/连接等瞬时错误保留状态，等下一轮重试。
+                    if "not found" in str(exc).lower() and task.status in {"active", "waiting"}:
                         task.status = "error"
                         task.error_reason = str(exc)
                         task.updated_at = _now_wall_ts()
