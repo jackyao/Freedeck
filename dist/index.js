@@ -1899,6 +1899,7 @@ function Content() {
                 settings: Object.assign({}, EMPTY_SETTINGS, next.settings || {}),
                 library_url: next.library_url || "",
                 power_diagnostics: next.power_diagnostics || {},
+                startup_checks: next.startup_checks || [],
             };
             latestStateRef.current = normalized;
             setState(normalized);
@@ -2064,6 +2065,7 @@ function Content() {
         const account = String(state.login.user_account || "").trim() || "未知账号";
         return `已登录：${account}（账号）`;
     }, [state.login.logged_in, state.login.user_account]);
+    const failedStartupChecks = SP_REACT.useMemo(() => (state.startup_checks || []).filter((check) => !check.ok), [state.startup_checks]);
     const performUninstallInstalledGame = SP_REACT.useCallback(async (item) => {
         const gameId = String(item.game_id || "").trim();
         const installPath = String(item.install_path || "").trim();
@@ -2112,7 +2114,13 @@ function Content() {
     if (loading) {
         return (SP_JSX.jsx(DFL.PanelSection, { children: SP_JSX.jsx(DFL.PanelSectionRow, { children: "\u52A0\u8F7D\u4E2D..." }) }));
     }
-    return (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsxs(DFL.PanelSection, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: {
+    return (SP_JSX.jsxs(SP_JSX.Fragment, { children: [failedStartupChecks.length > 0 && (SP_JSX.jsx(DFL.PanelSection, { title: `环境自检（${failedStartupChecks.length} 项异常）`, children: failedStartupChecks.map((check) => (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: {
+                            width: "100%",
+                            color: check.level === "critical" ? "#ff6b6b" : "#f0ad4e",
+                            fontSize: "12px",
+                            lineHeight: "1.4",
+                            wordBreak: "break-all",
+                        }, title: check.message, children: [check.level === "critical" ? "✗" : "⚠", " ", check.label, "\uFF1A", check.message] }) }, check.id))) })), SP_JSX.jsxs(DFL.PanelSection, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: {
                                 width: "100%",
                                 overflow: "hidden",
                                 textOverflow: "ellipsis",

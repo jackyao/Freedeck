@@ -87,6 +87,14 @@ interface SettingsState {
   auto_install: boolean;
 }
 
+interface StartupCheck {
+  id: string;
+  label: string;
+  ok: boolean;
+  level: string;
+  message: string;
+}
+
 interface PanelState {
   login: LoginState;
   installed: InstalledState;
@@ -94,6 +102,7 @@ interface PanelState {
   settings: SettingsState;
   library_url: string;
   power_diagnostics?: Record<string, unknown>;
+  startup_checks?: StartupCheck[];
 }
 
 interface SettingsPayload {
@@ -2474,6 +2483,7 @@ function Content() {
         settings: Object.assign({}, EMPTY_SETTINGS, next.settings || {}),
         library_url: next.library_url || "",
         power_diagnostics: next.power_diagnostics || {},
+        startup_checks: next.startup_checks || [],
       };
       latestStateRef.current = normalized;
       setState(normalized);
@@ -2636,6 +2646,10 @@ function Content() {
     const account = String(state.login.user_account || "").trim() || "未知账号";
     return `已登录：${account}（账号）`;
   }, [state.login.logged_in, state.login.user_account]);
+  const failedStartupChecks = useMemo(
+    () => (state.startup_checks || []).filter((check) => !check.ok),
+    [state.startup_checks],
+  );
 
   const performUninstallInstalledGame = useCallback(
     async (item: InstalledGameItem) => {
@@ -2706,6 +2720,26 @@ function Content() {
 
   return (
     <>
+      {failedStartupChecks.length > 0 && (
+        <PanelSection title={`环境自检（${failedStartupChecks.length} 项异常）`}>
+          {failedStartupChecks.map((check) => (
+            <PanelSectionRow key={check.id}>
+              <div
+                style={{
+                  width: "100%",
+                  color: check.level === "critical" ? "#ff6b6b" : "#f0ad4e",
+                  fontSize: "12px",
+                  lineHeight: "1.4",
+                  wordBreak: "break-all",
+                }}
+                title={check.message}
+              >
+                {check.level === "critical" ? "✗" : "⚠"} {check.label}：{check.message}
+              </div>
+            </PanelSectionRow>
+          ))}
+        </PanelSection>
+      )}
       <PanelSection>
         <PanelSectionRow>
           <div
