@@ -27,6 +27,7 @@ import config
 from aria2_manager import Aria2Error, Aria2Manager
 from game_catalog import GameCatalog, resolve_default_catalog_path
 from seven_zip_manager import SevenZipError, SevenZipManager
+from startup_checks import run_startup_checks
 from steam_shortcuts import (
     add_or_update_tianyi_shortcut,
     list_tianyi_shortcuts_sync,
@@ -265,6 +266,7 @@ class TianyiService:
         self.seven_zip = SevenZipManager(plugin_dir=plugin_dir)
         self._lock = asyncio.Lock()
         self._post_process_jobs: Dict[str, asyncio.Task] = {}
+        self._startup_checks: List[Dict[str, Any]] = []
 
         # 登录采集状态机（内存态）。
         self._capture_state: Dict[str, Any] = {
@@ -376,6 +378,8 @@ class TianyiService:
         for task in list(self.store.tasks):
             if task.status == "complete" and not task.post_processed:
                 self._schedule_post_process_task(task.task_id)
+        # 启动环境自检，结果随面板状态透出给前端展示。
+        self._startup_checks = await asyncio.to_thread(run_startup_checks, self)
 
     async def shutdown(self) -> None:
         """关闭后台资源。"""
@@ -576,6 +580,7 @@ class TianyiService:
             "library_url": library_url,
             "login_capture": await self.get_login_capture_status(),
             "power_diagnostics": power_diagnostics,
+            "startup_checks": list(self._startup_checks),
         }
 
     def get_cloud_login_url(self) -> str:
