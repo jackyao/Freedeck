@@ -47,6 +47,8 @@ from tianyi_store import TianyiInstalledGame, TianyiStateStore, TianyiTaskRecord
 
 
 TASK_RETENTION_SECONDS = 7 * 24 * 3600
+# 解压后体积通常大于压缩包，按 1.5 倍估算安装所需空间，避免装到一半磁盘写满。
+INSTALL_SPACE_ESTIMATE_FACTOR = 1.5
 PANEL_TASK_REFRESH_TIMEOUT_SECONDS = 2.0
 LOCAL_WEB_READY_TIMEOUT_SECONDS = 3.0
 LOCAL_WEB_PROBE_TIMEOUT_SECONDS = 1.2
@@ -4641,7 +4643,7 @@ class TianyiService:
             raise TianyiApiError("未找到可下载文件，可能所选条目是目录")
 
         required_download_bytes = sum(max(0, int(file_item.size or 0)) for file_item in files)
-        required_install_bytes = required_download_bytes
+        required_install_bytes = int(required_download_bytes * INSTALL_SPACE_ESTIMATE_FACTOR)
         free_download_bytes = _disk_free_bytes(target_download)
         free_install_bytes = _disk_free_bytes(target_install)
         download_dir_ok = free_download_bytes >= required_download_bytes
