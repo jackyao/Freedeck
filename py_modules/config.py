@@ -1,31 +1,56 @@
-﻿# config.py - Freedeck 配置与日志
+# config.py - Freedeck 配置与日志
 
 import logging
 import os
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
+
+_LOG_FORMAT = "[%(asctime)s | %(filename)s:%(lineno)s:%(funcName)s] %(levelname)s: %(message)s"
+_LOG_MAX_BYTES = 10 * 1024 * 1024
+_LOG_BACKUP_COUNT = 7
+
+
+def _resolve_log_dir() -> str:
+    """日志目录：优先 Decky 持久日志目录，开发环境回退到插件目录下的 .tmp/logs。
+
+    注意不能写 /tmp：SteamOS 上 /tmp 是 tmpfs，重启即丢，故障现场无法保留。
+    """
+    try:
+        import decky
+
+        candidate = str(getattr(decky, "DECKY_PLUGIN_LOG_DIR", "") or "").strip()
+        if candidate:
+            return candidate
+    except Exception:
+        pass
+    return str(Path(__file__).resolve().parents[1] / ".tmp" / "logs")
 
 
 def setup_logger() -> logging.Logger:
-    """初始化日志器。"""
+    """初始化日志器：RotatingFileHandler（10MB × 7），落盘失败降级到控制台。"""
+    named = logging.getLogger("freedeck")
+    named.setLevel(logging.INFO)
+    if named.handlers:
+        return named
+
+    handler: logging.Handler
     try:
-        logging.basicConfig(
-            level=logging.INFO,
-            filename="/tmp/freedeck.log",
-            format="[%(asctime)s | %(filename)s:%(lineno)s:%(funcName)s] %(levelname)s: %(message)s",
-            filemode="a",
-            force=True,
+        log_dir = _resolve_log_dir()
+        os.makedirs(log_dir, exist_ok=True)
+        handler = RotatingFileHandler(
+            os.path.join(log_dir, "freedeck.log"),
+            maxBytes=_LOG_MAX_BYTES,
+            backupCount=_LOG_BACKUP_COUNT,
+            encoding="utf-8",
         )
     except Exception:
-        logging.basicConfig(
-            level=logging.INFO,
-            format="[%(asctime)s | %(filename)s:%(lineno)s:%(funcName)s] %(levelname)s: %(message)s",
-            force=True,
-        )
-    return logging.getLogger("freedeck")
+        handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter(_LOG_FORMAT))
+    named.addHandler(handler)
+    return named
 
 
 logger = setup_logger()
-logger.setLevel(logging.INFO)
 
 # 路径配置
 HOME_DIR = str(Path.home())
